@@ -11,6 +11,8 @@ class keypad:
         for j in columns :
             GPIO.setup(j, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)        # Configure Column Pins as Input pins
 
+    # Read Keypad 
+    # Make sure to not read a key press multiple times if the key is pressed for longer duration
     def readKeypad(self) :
         noPress = True
         noPressOld = True
@@ -31,6 +33,8 @@ class keypad:
                         String = String + myChar
             noPressOld = noPress
 
+
+# Import Libraries / Initialize Senors / Configure GPIO Pins
 import RPi.GPIO as GPIO
 from time import sleep
 import threading 
@@ -39,11 +43,19 @@ import LCD1602
 LCD1602.init(0x27,1)                    # LCD1602 uses I2C Protocol       
 
 myPad = keypad()
-password = '1234'                       #Password set to 1234 for initial use 
+password = '1234'                       # Password set to 1234 for initial access 
 myString = ''
 
+PIRpin = 8                              # PIR Sensor connected to Raspberry Pi Pin 8
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(PIRpin, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)   # Configure PIR Pin as GPIO input Pin
+
+BuzzerPin = 16                          # Active Buzzer connected to Raspberry Pi Pin 16
+GPIO.setup(BuzzerPin, GPIO.OUT)         # Configure Buzzer Pin as GPIO output Pin
+
+
 # BACKGROUND THREAD
-# TASK : Keep reading input from Keypad
+# TASK : Keep reading input from Keypad at all times 
 def readKP() :
     global myString
     while myString != '*' :             # Use * character to exit the program
@@ -59,13 +71,23 @@ readThread.start()
 # TASK : Initialize 3 Modes of Operation 
 while myString != '*':
     CMD = myString                      # myString is a global variable and can change it's value at any instant
-    if CMD == 'A' + password:           # Mode : ARMED 
+    if CMD == 'A' + password:           # MODE : ARMED 
         LCD1602.write(0,0,'ARMED !!')
+        buzzval = GPIO.input(PIRpin)    # Read input from PIR Sensor 
+
+        if buzzval == 1 :               # Intruder Alert if the PIR sensor detects motion
+            LCD1602.write (0, 0, 'Intruder Alert !!')
+            GPIO.output(BuzzerPin, 1)
+            sleep(5)
+
+        if buzzval == 0 :
+            LCD1602.write (0, 0, 'All Clear')
+            GPIO.output(BuzzerPin, 0)
     
-    if CMD == 'B' + password:           # Mode : Unarmed 
+    if CMD == 'B' + password:           # MODE : Unarmed 
         LCD1602.write(0,0,'UnArmed !!')
 
-    if CMD == 'C' + password:           # Mode : Change Password
+    if CMD == 'C' + password:           # MODE : Change Password
         LCD1602.write(0,0,'Password ?')
         while CMD == 'C' + password:
             pass
